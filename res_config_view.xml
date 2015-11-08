@@ -7,18 +7,11 @@
       <field name="inherit_id" ref="account.view_account_config_settings"/>
       <field name="arch" type="xml">
         <xpath expr="//separator[@string='eInvoicing &amp; Payments']" position="before">
-          <group name="internal_grp">
+          <group name="internal_grp" col="2">
             <label for="id" string="Internal Vouchers"/>
-            <div>
-              <div>
-                <label for="default_transfer_account_id"/>
-                <field name="default_transfer_account_id" class="oe_inline"/>
-              <div>
-              </div>
-                <label for="default_transfer_journal_id"/>
-                <field name="default_transfer_journal_id" class="oe_inline"/>
-              </div>
-            </div>
+            <group>
+              <field name="default_internal_transfer_account_id"/>
+            </group>
           </group>
         </xpath>
       </field>

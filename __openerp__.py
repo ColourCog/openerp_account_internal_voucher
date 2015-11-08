@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 {
     "name" : "Internal Vouchers",
     "version" : "0.1", 
@@ -11,18 +12,20 @@
         "account",
         "account_voucher",
     ], 
-    "summary" : "Enable internal payments and transfers", 
+    "summary" : "Enable internal fund transfers", 
     "description" : """
 Internal Vouchers
-========================
+=================
 This module adds internal payments and transfer capabilities to OpenERP.
+It is able to generate a voucher on the chosen side of the transaction.
     """,
     "data" : [ 
-      'account_voucher_view.xml', 
+      "security/ir.model.access.csv",
+      'internal_voucher_view.xml', 
+      'internal_voucher_workflow.xml', 
       'res_config_view.xml', 
     ], 
     'installable': True,
     'auto_install': False,
     'application': False,
 }
-

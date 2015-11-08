@@ -1,31 +1,35 @@
 # -*- coding: utf-8 -*-
-##############################################################################
-#
-#    OpenERP, Open Source Business Applications
-#    Copyright (C) 2004-2012 OpenERP S.A. (<http://openerp.com>).
-#
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Affero General Public License as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-#
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-##############################################################################
 
 from openerp.osv import fields, osv
+
+class res_company(osv.osv):
+    _inherit = "res.company"
+
+    _columns = {
+        'default_internal_transfer_account_id': fields.many2one('account.account',
+            'The transfer account for internal vouchers'),
+    }
 
 class account_config_settings(osv.osv_memory):
     _inherit = 'account.config.settings'
     _columns = {
-        'default_transfer_account_id': fields.many2one('account.account', 
-            'The default account to use for internal transfers'),
-        'default_transfer_journal_id': fields.many2one('account.journal', 
-            'The journal to use by default for internal transfers'),
+        'default_internal_transfer_account_id': fields.related(
+            'company_id',
+            'default_internal_transfer_account_id',
+            type='many2one',
+            relation='account.account',
+            string="Internal Transfer Account"),
     }
+
+    def onchange_company_id(self, cr, uid, ids, company_id, context=None):
+        res = super(account_config_settings, self).onchange_company_id(cr, uid, ids, company_id, context=None)
+        # update related fields
+        res['value'].update({
+            'default_internal_transfer_account_id': False,
+        })
+        if company_id:
+            company = self.pool.get('res.company').browse(cr, uid, company_id, context=context)
+            res['value'].update({
+                'default_internal_transfer_account_id': company.default_internal_transfer_account_id and company.default_internal_transfer_account_id.id or False,
+            })
+        return res

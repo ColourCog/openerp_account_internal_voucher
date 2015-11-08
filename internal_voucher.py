@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from openerp import netsvc
 from openerp.osv import fields, osv
 import openerp.addons.decimal_precision as dp
 from openerp.tools.translate import _
@@ -97,8 +99,8 @@ class account_voucher_internal(osv.osv):
             states={'draft': [('readonly', False)]}),
         'state': fields.selection(
             [('draft', 'Draft'),
-             ('cancel', 'Cancelled'),
-             ('posted', 'Posted')],
+             ('posted', 'Posted'),
+             ('cancel', 'Cancelled')],
             'Status',
             readonly=True),
         'transfer_type': fields.selection(
@@ -236,7 +238,7 @@ class account_voucher_internal(osv.osv):
     # CRUD
     def create(self, cr, uid, vals, context=None):
         period_obj = self.pool.get('account.period')
-        vals['period_id'] = period_obj.find(cr, uid, date, context=context)[0]
+        vals['period_id'] = period_obj.find(cr, uid, vals['date'], context=context)[0]
         return super(account_voucher_internal, self).create(cr, uid, vals, context=context)
     
     def unlink(self, cr, uid, ids, context=None):

@@ -42,7 +42,7 @@
       <field name="arch" type="xml">
         <form string="Internal Transfer" version="7.0">
           <header>
-            <button name="internal_draft" states="cancel" string="Draft" groups="account.group_account_invoice" />
+            <button name="internal_draft" states="cancel" type="object" string="Draft" groups="account.group_account_invoice" />
             <button name="validate" states="draft" string="Post" groups="account.group_account_invoice" class="oe_highlight"/>
             <button name="cancel" states="posted" string="Cancel" groups="account.group_account_invoice" />
             <field name="state" widget="statusbar" statusbar_visible="draft,posted" statusbar_colors='{"cancel":"red"}'/>

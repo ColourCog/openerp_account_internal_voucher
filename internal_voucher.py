@@ -274,7 +274,7 @@ class account_voucher_internal(osv.osv):
         if transfer.credit_journal_id.type not in ['cash', 'bank']:
             raise osv.except_osv(
                 _('Cannot create voucher!'),
-                _('The journal must be of type "bank" or "cash".'))
+                _('The origin journal must be of type "bank" or "cash".'))
         res = {}
         res['debit_move_id'] = self._create_move(
             cr, 
@@ -307,7 +307,7 @@ class account_voucher_internal(osv.osv):
         if transfer.debit_journal_id.type not in ['cash', 'bank']:
             raise osv.except_osv(
                 _('Cannot create voucher!'),
-                _('The journal must be of type "bank" or "cash".'))
+                _('The destination journal must be of type "bank" or "cash".'))
         res = {}
         res['credit_move_id'] = self._create_move(
             cr, 

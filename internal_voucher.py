@@ -265,29 +265,31 @@ class account_voucher_internal(osv.osv):
     
     def internal_validate(self, cr, uid, ids, context=None):
         """Create all moves and vouchers"""
-        return self.write(
-            cr,
-            uid,
-            ids,
-            {'state': 'posted'},
-            context=context)
-    
+        for transfer in self.browse(cr, uid, ids):
+            res = {}
+            # read the transfer type and decide what to do from there
+            
+            self.write(
+                cr,
+                uid,
+                [transfer.id],
+                res.update({'state': 'posted'}),
+                context=context)
+        return True
+        
     def internal_cancel(self, cr, uid, ids, context=None):
         """Cancel/Delete all moves and vouchers"""
-        return self.write(
-            cr,
-            uid,
-            ids,
-            {'state': 'cancel'},
-            context=context)
+        for transfer in self.browse(cr, uid, ids):
+            res = {}
+            vouchers = []
+            moves = []
+            # unreconcile, then cancel/delete vouchers
+            # unpost, then delete moves
+            self.write(
+                cr,
+                uid,
+                [transfer.id],
+                res.update({'state': 'cancel'}),
+                context=context)
     
-    
-#~ TODO:
-    #~ take inspiration from the loan module for how to go about abstracting
-    #~ this.
-    #~ a voucher should only be created if the journal is of type cash/bank.
-    #~ If no bank voucher is selected at all, then the module should simply create 
-    #~ two reconciled moves. This keeps the tool flexible.
-    #~ if more than one journal is of type bank, block it all.
-
 account_voucher_internal()

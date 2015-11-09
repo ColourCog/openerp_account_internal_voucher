@@ -56,6 +56,7 @@ class account_voucher_internal(osv.osv):
         'credit_journal_id': fields.many2one(
             'account.journal',
             'Register in',
+            required=True,
             readonly=True,
             states={'draft': [('readonly', False)]}),
         'credit_voucher_id': fields.many2one(
@@ -75,6 +76,7 @@ class account_voucher_internal(osv.osv):
         'debit_journal_id': fields.many2one(
             'account.journal',
             'Register in',
+            required=True,
             readonly=True,
             states={'draft': [('readonly', False)]}),
         'debit_voucher_id': fields.many2one(
@@ -130,13 +132,13 @@ class account_voucher_internal(osv.osv):
         period_obj = self.pool.get('account.period')
         period_id = period_obj.find(cr, uid, date, context=ctx)[0]
         transfer = self.browse(cr, uid, transfer_id, context=ctx)
-        journal = self.journal_obj(cr, uid, journal_id, context=ctx)
+        journal = journal_obj.browse(cr, uid, journal_id, context=ctx)
         company_id = transfer.company_id.id
 
         move_id =  move_obj.create(
             cr, 
             uid, 
-            self.pool.get('account.move').account_move_prepare(
+            move_obj.account_move_prepare(
                 cr, 
                 uid, 
                 journal_id,
@@ -145,27 +147,29 @@ class account_voucher_internal(osv.osv):
                 company_id=company_id, 
                 context=ctx),
             context=ctx)
-            
 
         lml = []
         # common values
         vals = { 
+        }
+        # create the credit move line
+        lml.append({
             'partner_id': transfer.partner_id.id,
             'name': transfer.name,
             'date_maturity': date,
             'period_id': period_id,
-        }
-        # create the debit move line
-        lml.append({
-            'debit': amount,
-            'account_id': debit_id,
-            }.update(vals))
-
-        # create the credit move line
-        lml.append({
             'credit': amount,
             'account_id': credit_id,
-            }.update(vals))
+            })
+        # create the debit move line
+        lml.append({
+            'partner_id': transfer.partner_id.id,
+            'name': transfer.name,
+            'date_maturity': date,
+            'period_id': period_id,
+            'debit': amount,
+            'account_id': debit_id,
+            })
         # convert eml into an osv-valid format
         lines = [(0, 0, x) for x in lml]
         move_obj.write(cr, uid, [move_id], {'line_id': lines}, context=ctx)
@@ -235,6 +239,101 @@ class account_voucher_internal(osv.osv):
         voucher_obj.button_proforma_voucher(cr, uid, [voucher_id], context)
         return voucher_id
     
+    def _pure_move(self, cr, uid, transfer_id, context=None):
+        """Simply create the moves using the transfer account"""
+        transfer = self.browse(cr, uid, transfer_id, context=context)
+        res = {}
+        res['credit_move_id'] = self._create_move(
+            cr, 
+            uid, 
+            transfer.id,
+            transfer.reference,
+            transfer.credit_account_id.id, 
+            transfer.transfer_account_id.id, 
+            transfer.credit_journal_id.id,
+            transfer.date,
+            transfer.amount,
+            context)
+        res['debit_move_id'] = self._create_move(
+            cr, 
+            uid, 
+            transfer.id,
+            transfer.reference,
+            transfer.transfer_account_id.id, 
+            transfer.debit_account_id.id, 
+            transfer.debit_journal_id.id,
+            transfer.date,
+            transfer.amount,
+            context)
+        #TODO: reconcile these two
+        return res
+    
+    def _outbound_voucher(self, cr, uid, transfer_id, context=None):
+        """Voucher on Origin"""
+        transfer = self.browse(cr, uid, transfer_id, context=context)
+        if transfer.credit_journal_id.type not in ['cash', 'bank']:
+            raise osv.except_osv(
+                _('Cannot create voucher!'),
+                _('The journal must be of type "bank" or "cash".'))
+        res = {}
+        res['debit_move_id'] = self._create_move(
+            cr, 
+            uid, 
+            transfer.id,
+            transfer.reference,
+            transfer.transfer_account_id.id, 
+            transfer.debit_account_id.id, 
+            transfer.debit_journal_id.id,
+            transfer.date,
+            transfer.amount,
+            context)
+        res['credit_voucher_id'] = self._create_voucher(
+            cr, 
+            uid, 
+            transfer.id,
+            res['debit_move_id'],
+            transfer.credit_journal_id.id,
+            transfer.name,
+            'out',
+            transfer.reference,
+            transfer.date,
+            transfer.amount,
+            context)
+        return res
+
+    def _inbound_voucher(self, cr, uid, transfer_id, context=None):
+        """Voucher on Destination"""
+        transfer = self.browse(cr, uid, transfer_id, context=context)
+        if transfer.debit_journal_id.type not in ['cash', 'bank']:
+            raise osv.except_osv(
+                _('Cannot create voucher!'),
+                _('The journal must be of type "bank" or "cash".'))
+        res = {}
+        res['credit_move_id'] = self._create_move(
+            cr, 
+            uid, 
+            transfer.id,
+            transfer.reference,
+            transfer.transfer_account_id.id, 
+            transfer.credit_account_id.id, 
+            transfer.credit_journal_id.id,
+            transfer.date,
+            transfer.amount,
+            context)
+        res['debit_voucher_id'] = self._create_voucher(
+            cr, 
+            uid, 
+            transfer.id,
+            res['credit_move_id'],
+            transfer.debit_journal_id.id,
+            transfer.name,
+            'out',
+            transfer.reference,
+            transfer.date,
+            transfer.amount,
+            context)
+        return res
+        
     # CRUD
     def create(self, cr, uid, vals, context=None):
         period_obj = self.pool.get('account.period')
@@ -265,31 +364,65 @@ class account_voucher_internal(osv.osv):
     
     def internal_validate(self, cr, uid, ids, context=None):
         """Create all moves and vouchers"""
+        tx = {
+            'account': self._pure_move,
+            'outbound': self._outbound_voucher,
+            'inbound': self._inbound_voucher,
+        }
         for transfer in self.browse(cr, uid, ids):
-            res = {}
+            res = {'state': 'posted'}
             # read the transfer type and decide what to do from there
-            
-            self.write(
-                cr,
-                uid,
-                [transfer.id],
-                res.update({'state': 'posted'}),
-                context=context)
+            res.update(tx.get(transfer.transfer_type)(cr, uid, transfer.id, context))
+            # We're done, let's post it!
+            self.write(cr, uid, [transfer.id], res, context=context)
         return True
         
     def internal_cancel(self, cr, uid, ids, context=None):
         """Cancel/Delete all moves and vouchers"""
+        move_obj = self.pool.get('account.move')
+        voucher_obj = self.pool.get('account.voucher')
+        res = {
+            'credit_move_id': False,
+            'credit_voucher_id': False,
+            'debit_move_id': False,
+            'debit_voucher_id': False,
+            'state': 'cancel',
+        }
         for transfer in self.browse(cr, uid, ids):
-            res = {}
-            vouchers = []
-            moves = []
-            # unreconcile, then cancel/delete vouchers
+            moves = [
+                transfer.credit_move_id.id,
+                transfer.debit_move_id.id,
+            ]
+            # unreconcile, then cancel/(delete?) vouchers
+            if transfer.credit_voucher_id:
+                voucher_obj.cancel_voucher(
+                    cr,
+                    uid,
+                    [transfer.credit_voucher_id.id],
+                    context=context)
+                voucher_obj.unlink(cr, uid, [transfer.credit_voucher_id.id], context=context)
+            if transfer.debit_voucher_id:
+                voucher_obj.cancel_voucher(
+                    cr,
+                    uid,
+                    [transfer.debit_voucher_id.id],
+                    context=context)
+                voucher_obj.unlink(cr, uid, [transfer.debit_voucher_id.id], context=context)
             # unpost, then delete moves
-            self.write(
-                cr,
-                uid,
-                [transfer.id],
-                res.update({'state': 'cancel'}),
-                context=context)
+            if transfer.credit_move_id:
+                move_obj.button_cancel(
+                    cr,
+                    uid,
+                    [transfer.credit_move_id.id],
+                    context=context)
+                move_obj.unlink(cr, uid, [transfer.credit_move_id.id], context=context)
+            if transfer.debit_move_id:
+                move_obj.button_cancel(
+                    cr,
+                    uid,
+                    [transfer.debit_move_id.id],
+                    context=context)
+                move_obj.unlink(cr, uid, [transfer.debit_move_id.id], context=context)
+        return self.write(cr, uid, ids, res, context=context)
     
 account_voucher_internal()

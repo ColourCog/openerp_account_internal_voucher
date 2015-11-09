@@ -6,13 +6,13 @@
       <field name="name">account.voucher.internal.tree</field>
       <field name="model">account.voucher.internal</field>
       <field name="arch" type="xml">
-        <tree colors="blue:state == 'draft';gray:state == 'cancel';red:audit" string="Transfers">
-          <field name="date"/>
+        <tree colors="blue:state == 'draft';gray:state == 'cancel'" string="Transfers">
           <field name="name"/>
           <field name="partner_id"/>
           <field name="credit_account_id" groups="account.group_account_user"/>
           <field name="debit_account_id" groups="account.group_account_user"/>
           <field name="amount" sum="Amount"/>
+          <field name="date"/>
           <field name="state"/>
         </tree>
       </field>
@@ -70,16 +70,16 @@
                   name="credit_account_id" 
                   domain="[('type','not in',['consolidation','view'])]" />
                 <field name="credit_journal_id" />
-                <field name="credit_voucher_id" />
                 <field name="credit_move_id" />
+                <field name="credit_voucher_id" />
               </group>
               <group string="Transfer to..." >
                 <field 
                   name="debit_account_id" 
                   domain="[('type','not in',['consolidation','view'])]" />
                 <field name="debit_journal_id" />
-                <field name="debit_voucher_id" />
                 <field name="debit_move_id" />
+                <field name="debit_voucher_id" />
               </group>
             </group>
           </sheet>
